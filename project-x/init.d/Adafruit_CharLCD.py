@@ -54,7 +54,7 @@ class Adafruit_CharLCD:
 
 
 
-    def __init__(self, pin_rs=25, pin_e=24, pins_db=[23, 17, 27, 22], GPIO = None):
+    def __init__(self, pin_rs=7, pin_e=8, pins_db=[25, 24, 23, 18], GPIO = None):
 	# Emulate the old behavior of using RPi.GPIO if we haven't been given
 	# an explicit GPIO interface to use
 	if not GPIO:
@@ -64,8 +64,7 @@ class Adafruit_CharLCD:
         self.pin_e = pin_e
         self.pins_db = pins_db
 
-      	self.GPIO.setwarnings(False)
-	self.GPIO.setmode(GPIO.BCM)
+        self.GPIO.setmode(GPIO.BCM)
         self.GPIO.setup(self.pin_e, GPIO.OUT)
         self.GPIO.setup(self.pin_rs, GPIO.OUT)
 
@@ -96,8 +95,6 @@ class Adafruit_CharLCD:
 		self.numlines = lines
     		self.displayfunction |= self.LCD_2LINE
 		self.currline = 0
-	else:
-		self.numlines = 0
 
 
     def home(self):
@@ -150,7 +147,7 @@ class Adafruit_CharLCD:
 	self.write4bits(self.LCD_DISPLAYCONTROL | self.displaycontrol)
 
 
-    def Blink(self):
+    def noBlink(self):
 	""" Turn on and off the blinking cursor """
 
 	self.displaycontrol &= ~self.LCD_BLINKON
@@ -257,7 +254,6 @@ class Adafruit_CharLCD:
 
 if __name__ == '__main__':
 
-    
     lcd = Adafruit_CharLCD()
 
     lcd.clear()

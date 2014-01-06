@@ -21,8 +21,8 @@ MATRIX = [ [ 1, 2, 3, 'A' ],
 	   [ 7, 8, 9, 'C' ],
 	   [ 'E', 0, 'F', 'G' ] ]
 
-ROW = [ 3, 4, 10, 9 ]
-COL = [ 11, 7, 8, 18 ]
+ROW = [ 11, 9, 10, 22 ]
+COL = [ 27, 17, 4, 3 ]
 
 for j in range (4):
 	GPIO.setup(COL[j], GPIO.OUT)
