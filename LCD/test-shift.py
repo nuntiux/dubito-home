@@ -1,71 +1,75 @@
+#!/usr/bin/python
+
 import RPi.GPIO as gpio
 from time import sleep
 
 class Shifter():
 
-    #inputA=15
-        inputB=26
-        clock=23
-        clearPin=24
+        dataPin=25
+	latchPin=24
+        clockPin=23
+        clearPin=18
 
 
         def __init__(self):
             self.setupBoard()
-                self.pause=0
-        def tick(self):
-            gpio.output(Shifter.clock,gpio.HIGH)
-                sleep(self.pause)
-                gpio.output(Shifter.clock,gpio.LOW)
-                sleep(self.pause)		
+            self.pause=0
 
-        def setValue(self,value):
-            for i in range(24):
-                bitwise=0x800000>>i
-                        bit=bitwise&value
-                        if (bit==0):
-                            gpio.output(Shifter.inputB,gpio.LOW)
-                        else:
-                            gpio.output(Shifter.inputB,gpio.HIGH)
-                        Shifter.tick(self)
+        def tick(self):
+            gpio.output(Shifter.clockPin,gpio.HIGH)
+            sleep(0)
+            gpio.output(Shifter.clockPin,gpio.LOW)
+
+        def latch(self):
+            gpio.output(Shifter.latchPin,gpio.HIGH)
+            sleep(0)
+            gpio.output(Shifter.latchPin,gpio.LOW)
 
         def clear(self):
+	    print 'Clear!!!'
             gpio.output(Shifter.clearPin,gpio.LOW)
+            Shifter.latch(self)
+	    sleep(1)
+            gpio.output(Shifter.clearPin,gpio.HIGH)
+
+        def setPin(self,value):
+	    print 'Printing %s' % value
+		
+            for i in xrange(1, 9):
+		print '   loop %s - %s' % (i, value)
+                if (i == value):
+		    print '    OK'
+                    gpio.output(Shifter.dataPin,gpio.HIGH)
+                else:
+                    gpio.output(Shifter.dataPin,gpio.LOW)
                 Shifter.tick(self)
-                gpio.output(Shifter.clearPin,gpio.HIGH)
+	    Shifter.latch(self)
 
         def setupBoard(self):
-
-            #gpio.setup(Shifter.inputA,gpio.OUT)
-                #gpio.output(Shifter.inputA,gpio.HIGH)
-
-                gpio.setup(Shifter.inputB,gpio.OUT)
-                gpio.output(Shifter.inputB,gpio.LOW)
-
-                gpio.setup(Shifter.clock,gpio.OUT)
-                gpio.output(Shifter.clock,gpio.LOW)
-
-                gpio.setup(Shifter.clearPin,gpio.OUT)
-                gpio.output(Shifter.clearPin,gpio.HIGH)
+            gpio.setup(Shifter.dataPin,gpio.OUT)
+            gpio.output(Shifter.dataPin,gpio.LOW)
+            gpio.setup(Shifter.latchPin,gpio.OUT)
+            gpio.output(Shifter.latchPin,gpio.LOW)
+            gpio.setup(Shifter.clockPin,gpio.OUT)
+            gpio.output(Shifter.clockPin,gpio.LOW)
+            gpio.setup(Shifter.clearPin,gpio.OUT)
+            gpio.output(Shifter.clearPin,gpio.HIGH)
 
 def main():
-    pause=0.5
-        gpio.setmode(gpio.BOARD)
-        shifter=Shifter()
-        running=True
-        while running==True:
-            try:
-                #shifter.clear()
-                        #shifter.setValue(1)
-                        #sleep(1)
-                        shifter.clear()
-                        shifter.setValue(0x0AAAAAA)
-                        sleep(pause)
-                        shifter.clear()
-                        shifter.setValue(0x0555555)
-                        sleep(pause)
-            except KeyboardInterrupt:
-                running=False
-
+    pause=0.2
+    gpio.setmode(gpio.BCM)
+    shifter=Shifter()
+    shifter.setupBoard()
+    shifter.clear()
+    running=True
+    while running==True:
+	try:
+		for i in xrange(1, 9):
+			shifter.setPin(i)
+			sleep(pause)
+	except KeyboardInterrupt:
+		running=False
+		shifter.clear()
 
 if __name__=="__main__":
     main()
