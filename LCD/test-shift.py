@@ -5,10 +5,10 @@ from time import sleep
 
 class Shifter():
 
-        dataPin=25
-	latchPin=24
-        clockPin=23
-        clearPin=18
+        dataPin=22
+	latchPin=11
+        clockPin=9
+        clearPin=10
 
 
         def __init__(self):
@@ -56,7 +56,7 @@ class Shifter():
             gpio.output(Shifter.clearPin,gpio.HIGH)
 
 def main():
-    pause=0.2
+    pause=1
     gpio.setmode(gpio.BCM)
     shifter=Shifter()
     shifter.setupBoard()

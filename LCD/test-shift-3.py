@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import RPi.GPIO as gpio
+#import random
 from time import sleep
 
 class Shifter():
@@ -34,8 +35,8 @@ class Shifter():
 
         def setPin(self,value):
 	    print 'Printing %s' % value
-		
-            for i in xrange(1, 9):
+
+            for i in xrange(24, 0, -1):
 		print '   loop %s - %s' % (i, value)
                 if (i == value):
 		    print '    OK'
@@ -43,6 +44,9 @@ class Shifter():
                 else:
                     gpio.output(Shifter.dataPin,gpio.LOW)
                 Shifter.tick(self)
+		if ((i != 24) and (i % 8) == 0):
+			print '     LATCH'
+			Shifter.latch(self)
 	    Shifter.latch(self)
 
         def setupBoard(self):
@@ -56,7 +60,7 @@ class Shifter():
             gpio.output(Shifter.clearPin,gpio.HIGH)
 
 def main():
-    pause=0.2
+    pause=1
     gpio.setmode(gpio.BCM)
     shifter=Shifter()
     shifter.setupBoard()
@@ -64,9 +68,12 @@ def main():
     running=True
     while running==True:
 	try:
-		for i in xrange(1, 9):
+		for i in xrange(1, 11):
 			shifter.setPin(i)
-			sleep(pause)
+			#shifter.setPin(random.randrange(1,11))
+			sleep(2)
+			shifter.clear()
+			
 	except KeyboardInterrupt:
 		running=False
 		shifter.clear()
