@@ -13,20 +13,20 @@
  
 
 export ROOTDIR=/root/test-pi/project-x/init.d
- 
+
 export HOME
 case "$1" in
     start)
         echo "Starting LCD"
-	$ROOTDIR/boot-up-lcd.py 2>&1
-    ;;
+#        nohup $ROOTDIR/boot-up-lcd.py 2>&1 &
+        ;;
     stop)
         echo "Stopping LCD"
-	$ROOTDIR/stop-lcd.py 2>&1
-    ;;
+        $ROOTDIR/stop-lcd.py 2>&1
+        ;;
     *)
         echo "Usage: /etc/init.d/lcd {start|stop}"
         exit 1
-    ;;
+        ;;
 esac
 exit 0
