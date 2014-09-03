@@ -12,8 +12,9 @@ from datetime import datetime
 import RPi.GPIO as GPIO
 import sys
 import getopt
+import json
 
-btnBounceTime=200
+btnBounceTime=400
 debug=False
 
 # ----------------------------------------------------------------------------
@@ -23,6 +24,7 @@ dataPin=22
 latchPin=11
 clockPin=9
 clearPin=10
+doorCheckPin=14
 btnU=17
 btnD=2
 btnR=27
@@ -59,12 +61,12 @@ class Shifter():
     def clear(self):
         GPIO.output(clearPin, GPIO.LOW)
         Shifter.latch(self)
-        sleep(1)
+        sleep(0.5)
         GPIO.output(clearPin, GPIO.HIGH)
 
-    def setPin(self,value):
+    def setPin(self, pin, value):
         for i in xrange(16, 0, -1):
-            if (i == value):
+            if ((value == True) and (i == pin)):
                 GPIO.output(dataPin, GPIO.HIGH)
             else:
                 GPIO.output(dataPin, GPIO.LOW)
@@ -84,53 +86,228 @@ class Shifter():
         GPIO.output(clearPin, GPIO.HIGH)
 
 shifter=Shifter()
-
-# ----------------------------------------------------------------------------
-# Button Handler
-# ----------------------------------------------------------------------------
-def buttonEventHandlerU (pin):
-    print "Button U Pressed"
-    lcd.clear()
-    lcd.message('Button U Pressed')
-    shifter.setPin(1)
-
-def buttonEventHandlerD (pin):
-    print "Button D Pressed"
-    lcd.clear()
-    lcd.message('Button D Pressed')
-    shifter.setPin(2)
-
-def buttonEventHandlerR (pin):
-    print "Button R Pressed"
-    lcd.clear()
-    lcd.message('Button R Pressed')
-    shifter.setPin(3)
-
-def buttonEventHandlerL (pin):
-    print "Button L Pressed"
-    lcd.clear()
-    lcd.message('Button L Pressed')
-    shifter.setPin(4)
-
-def buttonEventHandlerOk (pin):
-    print "Button Ok Pressed"
-    lcd.clear()
-    lcd.message('Button Ok Pressed')
-    shifter.setPin(5)
-
-
 # ----------------------------------------------------------------------------
 # Utilities function
 # ----------------------------------------------------------------------------
-def run_cmd(cmd):
+def runCmd(cmd):
     p = Popen(cmd, shell=True, stdout=PIPE)
     output = p.communicate()[0]
-    return output
+    return output.replace("\n", "")
+
+# ----------------------------------------------------------------------------
+# Menu
+# ----------------------------------------------------------------------------
+class MenuItem():
+    def __init__(self, name, parent, action, relay):
+        self.name = name
+        self.menuList = []
+        self.parent = parent
+        self.menuPos = 0
+        self.action = action
+        self.relay = relay
+        self.state = False
+
+    #
+    # Handle Navigation thru menu
+    #
+    def menuUp(self):
+        if (self.menuPos > 0):
+            self.menuPos -= 1
+        # refresh
+        if (self.action is not None):
+            self.action()
+        else:
+            self.displayMenu()
+
+    def menuDown(self):
+        if (self.menuPos < (len(self.menuList) - 1)):
+            self.menuPos += 1
+        # refresh
+        if (self.action is not None):
+            self.action()
+        else:
+            self.displayMenu()
+
+    def menuEnter(self):
+        global menuCurrent
+        if (self.menuPos < len(self.menuList)):
+            menuCurrent = self.menuList[self.menuPos]
+            menuCurrent.refreshDisplay()
+        elif self.relay is not None:
+            shifter.setPin(self.relay, not self.state)
+            self.state = not self.state
+            if (self.action is not None):
+                self.action()
+
+    def menuLeft(self):
+        global menuCurrent
+        if (self.parent is not None):
+            menuCurrent = self.parent
+        menuCurrent.displayMenu()
+
+    def menuRight(self):
+        self.menuEnter()
+
+    #
+    # refresh the current display
+    #
+    def refreshDisplay(self):
+        # If there is an action function, just run it
+        if (self.action is not None):
+            self.action()
+        else:
+            # it might be a submenu
+             self.displayMenu()
+
+    #
+    # Display the current menu and hightlight the position in the menu
+    #
+    def displayMenu(self):
+        lcd.clear()
+        if (len(self.menuList) > 0):
+            if (self.menuPos % lcd.numlines == 0):
+                for j in range (self.menuPos, self.menuPos + lcd.numlines):
+                    if  (j < len(self.menuList)):
+                        lcd.message('%s %s\n' % ("\2" if j == self.menuPos else
+                            " ", self.menuList[j].name))
+            else:
+                tmp = (self.menuPos / lcd.numlines) * lcd.numlines
+                for j in range (tmp, tmp + lcd.numlines):
+                    if  (j < len(self.menuList)):
+                        lcd.message('%s %s\n' % ("\2" if j == self.menuPos else
+                            " ", self.menuList[j].name))
+
+    #
+    # Add a submenu
+    #
+    def appendMenu(self, newMenu):
+        newMenu.menuPos = len(self.menuList)
+        self.menuList.append(newMenu)
+
+# ----------------------------------------------------------------------------
+# Action Menu
+# ----------------------------------------------------------------------------
+def networkAction():
+    lcd.clear()
+    # Ping google
+    cmd = "ping -c 1 www.google.com 2>&1 | grep packet | cut -d, -f3 | " \
+          "sed 's/packet //g' "
+    lcd.message("PING:%s\n" % (runCmd(cmd)))
+    # Get IP address
+    cmd = "ip addr show wlan0 | grep inet | grep -v inet6 | " \
+          "awk '{print $2}' | cut -d/ -f1 "
+    lcd.message("IP:%s" %(runCmd(cmd)))
+
+# ----------------------------------------------------------------------------
+# Status Menu
+# ----------------------------------------------------------------------------
+def statusAction():
+    lcd.clear()
+    cmd = "uptime | cut -d , -f 1| sed 's/.*up //g'"
+    lcd.message("U\2 %s\n" %(runCmd(cmd)))
+    cmd = "uptime | sed 's/.*average: //g' | cut -d, -f 1,2"
+    lcd.message("L\2 %s" %(runCmd(cmd)))
+
+# ----------------------------------------------------------------------------
+# Garage Menu
+# ----------------------------------------------------------------------------
+def garageAction():
+    lcd.clear()
+    lcd.message("Status: %s\n" % ("Closed" if GPIO.input(doorCheckPin) else
+        "Open"))
+    lcd.message("Press \6 or \2")
+
+# ----------------------------------------------------------------------------
+# Generic function to switch relay
+# ----------------------------------------------------------------------------
+def switchMenu():
+    global menuCurrent
+    lcd.clear()
+    lcd.message("%s:%s\n" %(menuCurrent.name, "On" if menuCurrent.state else 
+        "Off"))
+    lcd.message("Press \6 or \2")
+
+# ----------------------------------------------------------------------------
+# Menu Definition
+# ----------------------------------------------------------------------------
+menu = MenuItem("Main", None, None, None)
+
+# -----------------
+# Watering
+menuWatering = MenuItem("Watering", menu, None, None)
+# Manual Watering
+menuWaterManual = MenuItem("Manual", menuWatering, None, None)
+menuWaterManual.appendMenu(MenuItem("Lawn Front 1", menuWaterManual,
+    switchMenu, 1))
+menuWaterManual.appendMenu(MenuItem("Lawn Front 2", menuWaterManual,
+    switchMenu, 2))
+menuWaterManual.appendMenu(MenuItem("Lawn Right", menuWaterManual,
+    switchMenu, 3))
+menuWaterManual.appendMenu(MenuItem("Lawn Center", menuWaterManual,
+    switchMenu, 4))
+menuWaterManual.appendMenu(MenuItem("Lawn Side", menuWaterManual,
+    switchMenu, 5))
+menuWaterManual.appendMenu(MenuItem("Garden Beds", menuWaterManual,
+    switchMenu, 6))
+menuWaterManual.appendMenu(MenuItem("Fruits Trees", menuWaterManual,
+    switchMenu, 7))
+menuWaterManual.appendMenu(MenuItem("Mint", menuWaterManual,
+    switchMenu, 8))
+menuWatering.appendMenu(menuWaterManual)
+# Automatic Watering
+menuWatering.appendMenu(MenuItem("Automatic Settings", menuWatering, None, None))
+# Watering Status
+menuWatering.appendMenu(MenuItem("Status", menuWatering, None, None))
+menu.appendMenu(menuWatering)
+
+# -----------------
+# Garage Door
+menu.appendMenu(MenuItem("Garage Door", menu, garageAction, 9))
+# -----------------
+# Network
+menu.appendMenu(MenuItem("Network", menu, networkAction, None))
+# -----------------
+# Status
+menu.appendMenu(MenuItem("Status", menu, statusAction, None))
+
+
+menuCurrent = menu
+
+# ----------------------------------------------------------------------------
+# Button Handler from interrupt
+# ----------------------------------------------------------------------------
+def buttonEventHandlerU (pin):
+    global debug
+
+    if (debug):
+        print "KEYBOARD  ==> Up"
+    menuCurrent.menuUp()
+
+def buttonEventHandlerD (pin):
+    if (debug):
+        print "KEYBOARD  ==> Down"
+    menuCurrent.menuDown()
+
+def buttonEventHandlerR (pin):
+    if (debug):
+        print "KEYBOARD  ==> Right"
+    menuCurrent.menuRight()
+
+def buttonEventHandlerL (pin):
+    if (debug):
+        print "KEYBOARD  ==> Left"
+    menuCurrent.menuLeft()
+
+def buttonEventHandlerOk (pin):
+    if (debug):
+        print "KEYBOARD  ==> Ok"
+    menuCurrent.menuEnter()
 
 # ----------------------------------------------------------------------------
 # Main
 # ----------------------------------------------------------------------------
 def main(argv):
+    global debug
     try:
         opts, args = getopt.getopt(argv, "hd")
     except getopt.GetoptError:
@@ -139,33 +316,30 @@ def main(argv):
     for opt, arg in opts:
         if opt == '-d':
             debug = True
+            lcd.setDebug(True)
             print 'Debug is On'
-
-    # Get IP address
-    cmd = "ip addr show wlan0 | grep inet | grep -v inet6 | " \
-          "awk '{print $2}' | cut -d/ -f1"
-    lcd.begin(16,1)
+        elif opt == '-h':
+            sleep(5)
+    lcd.begin(16,2)
     lcd.clear()
-    lcd.message('BOOTING...')
-    sleep(2)
-    lcd.clear()
-    ipaddr = run_cmd(cmd)
-    lcd.message(datetime.now().strftime('%b %d  %H:%M:%S\n'))
-    lcd.message('%s' % ( ipaddr ) )
-
+    lcd.message('BOOTING')
     # tell the GPIO module that we want to use the chip's pin numbering
     # scheme
     GPIO.setmode(GPIO.BCM)
+    lcd.message('.')
     #GPIO.setwarnings(False)
     # Init shifter
     shifter.setupBoard()
     shifter.clear()
     # setup btn pin as an input
+    lcd.message('.')
     GPIO.setup(btnU, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.setup(btnD, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.setup(btnR, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.setup(btnL, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.setup(btnOk, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    GPIO.setup(doorCheckPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    lcd.message('.')
     GPIO.add_event_detect(btnU, GPIO.FALLING, callback=buttonEventHandlerU,
             bouncetime=btnBounceTime)
     GPIO.add_event_detect(btnD, GPIO.FALLING, callback=buttonEventHandlerD,
@@ -176,15 +350,20 @@ def main(argv):
             bouncetime=btnBounceTime)
     GPIO.add_event_detect(btnOk, GPIO.FALLING, callback=buttonEventHandlerOk,
             bouncetime=btnBounceTime)
-    
-    running=True
-    while running==True:
+    lcd.message('.')
+    menuCurrent.displayMenu()
+    running = True
+    while running == True:
         try:
+            sleep(10)
+            # Refresh the display in case something went wrong
             if (debug):
-                print '...waiting...'
-            sleep(2)
+                print 'REFRESH   ==> %s ' % menuCurrent.name
+            #lcd.noDisplay()
+            #lcd.display()
+            #menuCurrent.refreshDisplay()
         except KeyboardInterrupt:
-		    running=False
+		    running = False
 		    shifter.clear()
     GPIO.cleanup()
 

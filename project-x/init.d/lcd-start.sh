@@ -10,19 +10,27 @@
  
 #! /bin/sh
 # /etc/init.d/lcd
- 
+
+set -e 
 
 export ROOTDIR=/root/test-pi/project-x/init.d
+
+. /lib/lsb/init-functions
 
 export HOME
 case "$1" in
     start)
-        echo "Starting LCD"
-#        nohup $ROOTDIR/boot-up-lcd.py 2>&1 &
+	    log_daemon_msg "Starting LCD server" "boot-up-lcd" || true
+	    start-stop-daemon --start --quiet -b --pidfile /var/run/lcd.pid --exec $ROOTDIR/boot-up-lcd.py
+        log_end_msg 0 || true
         ;;
     stop)
-        echo "Stopping LCD"
-        $ROOTDIR/stop-lcd.py 2>&1
+	    log_daemon_msg "Stopping  LCD server" "boot-up-lcd" || true
+	    if start-stop-daemon --stop --quiet --oknodo --pidfile /var/run/lcd.pid; then
+	        log_end_msg 0 || true
+	    else
+	        log_end_msg 1 || true
+	    fi
         ;;
     *)
         echo "Usage: /etc/init.d/lcd {start|stop}"

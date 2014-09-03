@@ -52,7 +52,8 @@ class Adafruit_CharLCD:
     LCD_5x10DOTS            = 0x04
     LCD_5x8DOTS             = 0x00
 
-
+    def setDebug(self, debug):
+        self.debug = debug
 
     def __init__(self, pin_rs=7, pin_e=8, pins_db=[25, 24, 23, 18], GPIO = None):
         # Emulate the old behavior of using RPi.GPIO if we haven't been given
@@ -63,6 +64,8 @@ class Adafruit_CharLCD:
         self.pin_rs = pin_rs
         self.pin_e = pin_e
         self.pins_db = pins_db
+        self.debug = False
+        self.lock = False
 
         self.GPIO.setmode(GPIO.BCM)
         self.GPIO.setup(self.pin_e, GPIO.OUT)
@@ -70,7 +73,6 @@ class Adafruit_CharLCD:
 
         for pin in self.pins_db:
             self.GPIO.setup(pin, GPIO.OUT)
-
         self.write4bits(0x33) # initialization
         self.write4bits(0x32) # initialization
         self.write4bits(0x28) # 2 line 5x7 matrix
@@ -176,24 +178,42 @@ class Adafruit_CharLCD:
         self.write4bits(0b01010, True)
         self.clear()
 
+
     def begin(self, cols, lines):
+        if (self.debug):
+            print "LCD BEGIN  ==> S"
         if (lines > 1):
             self.numlines = lines
             self.displayfunction |= self.LCD_2LINE
             self.currline = 0
         self.numcols = cols
         self.curcol = 0
+        if (self.debug):
+            print "LCD BEGIN  ==>  F"
     
     def home(self):
+        if (self.debug):
+            print "LCD HOME   ==> S"
         self.currline = 0
         self.write4bits(self.LCD_RETURNHOME) # set cursor position to zero
         self.delayMicroseconds(3000) # this command takes a long time!
+        if (self.debug):
+            print "LCD HOME   ==>  F"
     
 
     def clear(self):
+        if (self.debug):
+            print "LCD CLEAR  ==> S"
+        if (self.lock):
+            print "LCD CLEAR  ==> EXIT"
+            return
+        self.lock = True
         self.currline = 0
         self.write4bits(self.LCD_CLEARDISPLAY) # command to clear display
         self.delayMicroseconds(3000)    # 3000 microsecond sleep, clearing the display takes a long time
+        if (self.debug):
+            print "LCD CLEAR  ==>  F"
+        self.lock = False
 
     def setCursor(self, col, row):
         self.row_offsets = [ 0x00, 0x40, 0x14, 0x54 ]
@@ -262,7 +282,7 @@ class Adafruit_CharLCD:
 
     def write4bits(self, bits, char_mode=False):
         """ Send command to LCD """
-        self.delayMicroseconds(1000) # 1000 microsecond sleep
+        self.delayMicroseconds(2000) # 1000 microsecond sleep
         bits=bin(bits)[2:].zfill(8)
         self.GPIO.output(self.pin_rs, char_mode)
         for pin in self.pins_db:
@@ -284,20 +304,29 @@ class Adafruit_CharLCD:
 
     def pulseEnable(self):
         self.GPIO.output(self.pin_e, False)
-        self.delayMicroseconds(1)        # 1 microsecond pause - enable pulse must be > 450ns 
+        self.delayMicroseconds(10)        # 1 microsecond pause - enable pulse must be > 450ns 
         self.GPIO.output(self.pin_e, True)
-        self.delayMicroseconds(1)        # 1 microsecond pause - enable pulse must be > 450ns 
+        self.delayMicroseconds(10)        # 1 microsecond pause - enable pulse must be > 450ns 
         self.GPIO.output(self.pin_e, False)
-        self.delayMicroseconds(1)        # commands need > 37us to settle
+        self.delayMicroseconds(10)        # commands need > 37us to settle
 
 
     def message(self, text):
+        if (self.debug):
+            print "LCD PRINT  ==> S"
+        if (self.lock):
+            print "LCD PRINT  ==> EXIT"
+            return
+        self.lock = True
         """ Send string to LCD. Newline wraps to second line"""
         for char in text:
             if char == '\n':
                 self.write4bits(0xC0) # next line
             else:
                 self.write4bits(ord(char),True)
+        if (self.debug):
+            print "LCD PRINT  ==>  F"
+        self.lock = False
 
 if __name__ == '__main__':
     lcd = Adafruit_CharLCD()
