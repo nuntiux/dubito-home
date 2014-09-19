@@ -1,10 +1,13 @@
 #!/usr/bin/python
-
+# ----------------------------------------------------------------------------
+# Samuel Pasquier - samuel@happycoders.org
 #
+# based On:
+# https://github.com/adafruit/Adafruit-Raspberry-Pi-Python-Code/blob/master/Adafruit_CharLCD/Adafruit_CharLCD.py
 # based on code from lrvick and LiquidCrystal
 # lrvic - https://github.com/lrvick/raspi-hd44780/blob/master/hd44780.py
 # LiquidCrystal - https://github.com/arduino/Arduino/blob/master/libraries/LiquidCrystal/LiquidCrystal.cpp
-#
+# ----------------------------------------------------------------------------
 
 from time import sleep
 
@@ -55,7 +58,8 @@ class Adafruit_CharLCD:
     def setDebug(self, debug):
         self.debug = debug
 
-    def __init__(self, pin_rs=7, pin_e=8, pins_db=[25, 24, 23, 18], GPIO = None):
+    def __init__(self, pin_rs=7, pin_e=8, pins_db=[25, 24, 23, 18],
+            GPIO = None):
         # Emulate the old behavior of using RPi.GPIO if we haven't been given
         # an explicit GPIO interface to use
         if not GPIO:
@@ -299,16 +303,20 @@ class Adafruit_CharLCD:
         self.pulseEnable()
 
     def delayMicroseconds(self, microseconds):
-        seconds = microseconds / float(1000000)    # divide microseconds by 1 million for seconds
+        seconds = microseconds / float(1000000)
+        # divide microseconds by 1 million for seconds
         sleep(seconds)
 
     def pulseEnable(self):
         self.GPIO.output(self.pin_e, False)
-        self.delayMicroseconds(10)        # 1 microsecond pause - enable pulse must be > 450ns 
+        self.delayMicroseconds(10)
+        # 1 microsecond pause - enable pulse must be > 450ns 
         self.GPIO.output(self.pin_e, True)
-        self.delayMicroseconds(10)        # 1 microsecond pause - enable pulse must be > 450ns 
+        self.delayMicroseconds(10)
+        # 1 microsecond pause - enable pulse must be > 450ns 
         self.GPIO.output(self.pin_e, False)
-        self.delayMicroseconds(10)        # commands need > 37us to settle
+        self.delayMicroseconds(10)
+        # commands need > 37us to settle
 
 
     def message(self, text):

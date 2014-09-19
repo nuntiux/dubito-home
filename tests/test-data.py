@@ -9,6 +9,7 @@ import sys
 import getopt
 import json
 import random
+from time import sleep
 
 debug=False
 
@@ -26,6 +27,7 @@ NUM_BIT_PER_SHIFTER =   8
 # 0 -> first relay
 # ----------------------------------------------------------------------------
 def turnRelayOn(relay):
+    global debug
     # Sanity Check
     if ((relay < 0) or (relay >= NUM_SHIFTER * NUM_BIT_PER_SHIFTER)):
         return False
@@ -38,8 +40,9 @@ def turnRelayOn(relay):
             # Create bitmask
             bitmask = 0b1 << bit
             shifters[i] |= bitmask
-            print "SET %d (shifter:%d, bit:%d, mask:%s) => %s" % (relay, i,
-                    bit, bin(bitmask), bin(shifters[i]))
+            if debug:
+                print "SET %d (shifter:%d, bit:%d, mask:%s) => %s" % (relay,
+                        i, bit, bin(bitmask), bin(shifters[i]))
             return True
     return False
 
@@ -60,8 +63,9 @@ def turnRelayOff(relay):
             # Create bitmask
             bitmask = 0b1 << bit
             shifters[i] &= ~bitmask
-            print "UNSET %d (shifter:%d, bit:%d, mask:%s) => %s" % (relay, i,
-                    bit, bin(bitmask), bin(shifters[i]))
+            if debug:
+                print "UNSET %d (shifter:%d, bit:%d, mask:%s) => %s" % (relay,
+                        i, bit, bin(bitmask), bin(shifters[i]))
             return True
     return False
 
@@ -80,8 +84,9 @@ def switchRelay(relay):
                 shifters[i] &= ~bitmask
             else:
                 shifters[i] |= bitmask
-            print "UNSET %d (shifter:%d, bit:%d, mask:%s) => %s" % (relay, i,
-                    bit, bin(bitmask), bin(shifters[i]))
+            if debug:
+                print "UNSET %d (shifter:%d, bit:%d, mask:%s) => %s" % (relay,
+                        i, bit, bin(bitmask), bin(shifters[i]))
             return True
     return False
 
@@ -90,6 +95,21 @@ def switchRelay(relay):
 # ----------------------------------------------------------------------------
 def createStep(relay, seconds):
     return ({ 'relay': relay, 'seconds': seconds })
+
+# ----------------------------------------------------------------------------
+# Play a registered sequence
+# ----------------------------------------------------------------------------
+def playSequence(seq):
+    global debug
+    if debug:
+        print "PLAY SEQUENCE (name:%s, cron:%s)" % (seq["name"], seq["cron"])
+    for i in seq["seq"]:
+        if debug:
+            print "    ITEM (relay:%d, seconds:%d)" %(i["relay"], i["seconds"])
+        turnRelayOn(i["relay"])
+        sleep(i["seconds"])
+        turnRelayOff(i["relay"])
+
 
 # ----------------------------------------------------------------------------
 # Usage 
@@ -119,16 +139,13 @@ def main(argv):
     # Initialize Shifter
     for i in range(0, NUM_SHIFTER):
         shifters.append(0x0)
-    turnRelayOn(1)
-    turnRelayOn(7)
-    turnRelayOn(11)
-    switchRelay(7)
     sequence = []
-    sequence.append(createStep(1, random.randrange(1, 240)))
-    sequence.append(createStep(3, random.randrange(1, 240)))
-    sequence.append(createStep(9, random.randrange(1, 240)))
+    sequence.append(createStep(1, random.randrange(1, 5)))
+    sequence.append(createStep(3, random.randrange(1, 5)))
+    sequence.append(createStep(9, random.randrange(1, 5)))
     matin = { 'name': "matin", 'seq': sequence , 'cron': "fooo" }
     print json.dumps(matin, indent = 4)
+    playSequence(matin)
 
 # ----------------------------------------------------------------------------
 if __name__ == "__main__":

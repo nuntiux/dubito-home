@@ -9,6 +9,7 @@ from Adafruit_CharLCD import Adafruit_CharLCD
 from subprocess import * 
 from time import sleep, strftime
 from datetime import datetime
+import Queue
 import RPi.GPIO as GPIO
 import sys
 import getopt
@@ -47,7 +48,7 @@ class Shifter():
     def __init__(self):
         self.setupBoard()
         self.pause=0
-        
+
     def tick(self):
         GPIO.output(clockPin, GPIO.HIGH)
         sleep(0)
@@ -72,7 +73,7 @@ class Shifter():
                 GPIO.output(dataPin, GPIO.LOW)
             Shifter.tick(self)
             if ((i != 16) and (i % 8) == 0):
-                Shifter.latch(self)    
+                Shifter.latch(self)
             Shifter.latch(self)
 
     def setupBoard(self):
@@ -168,14 +169,16 @@ class MenuItem():
             if (self.menuPos % lcd.numlines == 0):
                 for j in range (self.menuPos, self.menuPos + lcd.numlines):
                     if  (j < len(self.menuList)):
-                        lcd.message('%s %s\n' % ("\2" if j == self.menuPos else
-                            " ", self.menuList[j].name))
+                        lcd.message('%s %s\n' %
+                                ("\2" if j == self.menuPos else " ",
+                                    self.menuList[j].name))
             else:
                 tmp = (self.menuPos / lcd.numlines) * lcd.numlines
                 for j in range (tmp, tmp + lcd.numlines):
                     if  (j < len(self.menuList)):
-                        lcd.message('%s %s\n' % ("\2" if j == self.menuPos else
-                            " ", self.menuList[j].name))
+                        lcd.message('%s %s\n' %
+                                ("\2" if j == self.menuPos else " ",
+                                    self.menuList[j].name))
 
     #
     # Add a submenu
@@ -363,8 +366,8 @@ def main(argv):
             #lcd.display()
             #menuCurrent.refreshDisplay()
         except KeyboardInterrupt:
-		    running = False
-		    shifter.clear()
+            running = False
+            shifter.clear()
     GPIO.cleanup()
 
 if __name__=="__main__":
