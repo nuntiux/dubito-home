@@ -24,6 +24,8 @@ from subprocess import *
 from time import sleep, strftime
 from datetime import datetime
 import Queue
+import signal
+import os
 import RPi.GPIO as GPIO
 import sys
 import getopt
@@ -46,9 +48,6 @@ btnR=27
 btnL=3
 btnOk=4
 btnDoor=14 # 14 & 15 are unused today
-
-# init LCD
-lcd = Adafruit_CharLCD()
 
 # ----------------------------------------------------------------------------
 # Shifter Class
@@ -100,7 +99,21 @@ class Shifter():
         GPIO.setup(clearPin, GPIO.OUT)
         GPIO.output(clearPin, GPIO.HIGH)
 
-shifter=Shifter()
+# ----------------------------------------------------------------------------
+# Initialize Global Variables
+# ----------------------------------------------------------------------------
+# init LCD
+lcd = Adafruit_CharLCD()
+# init LCD Queue message
+lcdQueue = Queue.Queue()
+# init Shifter
+shifter = Shifter()
+
+# ----------------------------------------------------------------------------
+# lcdPrint
+# ----------------------------------------------------------------------------
+def lcdPrint(text):
+    lcdQueue.put(text)
 
 # ----------------------------------------------------------------------------
 # Utilities function
@@ -179,19 +192,19 @@ class MenuItem():
     # Display the current menu and hightlight the position in the menu
     #
     def displayMenu(self):
-        lcd.clear()
+        lcdPrint("CLEAR")
         if (len(self.menuList) > 0):
             if (self.menuPos % lcd.numlines == 0):
                 for j in range (self.menuPos, self.menuPos + lcd.numlines):
                     if  (j < len(self.menuList)):
-                        lcd.message('%s %s\n' %
+                        lcdPrint('%s %s\n' %
                                 ("\2" if j == self.menuPos else " ",
                                     self.menuList[j].name))
             else:
                 tmp = (self.menuPos / lcd.numlines) * lcd.numlines
                 for j in range (tmp, tmp + lcd.numlines):
                     if  (j < len(self.menuList)):
-                        lcd.message('%s %s\n' %
+                        lcdPrint('%s %s\n' %
                                 ("\2" if j == self.menuPos else " ",
                                     self.menuList[j].name))
 
@@ -206,44 +219,44 @@ class MenuItem():
 # Action Menu
 # ----------------------------------------------------------------------------
 def networkAction():
-    lcd.clear()
+    lcdPrint("CLEAR")
     # Ping google
     cmd = "ping -c 1 www.google.com 2>&1 | grep packet | cut -d, -f3 | " \
           "sed 's/packet //g' "
-    lcd.message("PING:%s\n" % (runCmd(cmd)))
+    lcdPrint("PING:%s\n" % (runCmd(cmd)))
     # Get IP address
     cmd = "ip addr show wlan0 | grep inet | grep -v inet6 | " \
           "awk '{print $2}' | cut -d/ -f1 "
-    lcd.message("IP:%s" %(runCmd(cmd)))
+    lcdPrint("IP:%s" %(runCmd(cmd)))
 
 # ----------------------------------------------------------------------------
 # Status Menu
 # ----------------------------------------------------------------------------
 def statusAction():
-    lcd.clear()
+    lcdPrint("CLEAR")
     cmd = "uptime | cut -d , -f 1| sed 's/.*up //g'"
-    lcd.message("U\2 %s\n" %(runCmd(cmd)))
+    lcdPrint("U\2 %s\n" %(runCmd(cmd)))
     cmd = "uptime | sed 's/.*average: //g' | cut -d, -f 1,2"
-    lcd.message("L\2 %s" %(runCmd(cmd)))
+    lcdPrint("L\2 %s" %(runCmd(cmd)))
 
 # ----------------------------------------------------------------------------
 # Garage Menu
 # ----------------------------------------------------------------------------
 def garageAction():
-    lcd.clear()
-    lcd.message("Status: %s\n" % ("Closed" if GPIO.input(doorCheckPin) else
+    lcdPrint("CLEAR")
+    lcdPrint("Status: %s\n" % ("Closed" if GPIO.input(doorCheckPin) else
         "Open"))
-    lcd.message("Press \6 or \2")
+    lcdPrint("Press \6 or \2")
 
 # ----------------------------------------------------------------------------
 # Generic function to switch relay
 # ----------------------------------------------------------------------------
 def switchMenu():
     global menuCurrent
-    lcd.clear()
-    lcd.message("%s:%s\n" %(menuCurrent.name, "On" if menuCurrent.state else 
+    lcdPrint("CLEAR")
+    lcdPrint("%s:%s\n" %(menuCurrent.name, "On" if menuCurrent.state else 
         "Off"))
-    lcd.message("Press \6 or \2")
+    lcdPrint("Press \6 or \2")
 
 # ----------------------------------------------------------------------------
 # Menu Definition
@@ -322,10 +335,17 @@ def buttonEventHandlerOk (pin):
     menuCurrent.menuEnter()
 
 # ----------------------------------------------------------------------------
+# Handler for SIGTERM
+# ----------------------------------------------------------------------------
+def sigtermHandler(_signo, _stack_frame):
+    sys.exit(0)
+
+# ----------------------------------------------------------------------------
 # Main
 # ----------------------------------------------------------------------------
 def main(argv):
     global debug
+    
     try:
         opts, args = getopt.getopt(argv, "hd")
     except getopt.GetoptError:
@@ -338,6 +358,7 @@ def main(argv):
             print 'Debug is On'
         elif opt == '-h':
             sleep(5)
+    signal.signal(signal.SIGTERM, sigtermHandler)
     lcd.begin(16,2)
     lcd.clear()
     lcd.message('BOOTING')
@@ -373,7 +394,13 @@ def main(argv):
     running = True
     while running == True:
         try:
-            sleep(10)
+            while not lcdQueue.empty():
+                msg = lcdQueue.get()
+                if (msg == "CLEAR"):
+                    lcd.clear()
+                else:
+                    lcd.message(msg)
+            sleep(0.3)
             # Refresh the display in case something went wrong
             if (debug):
                 print 'REFRESH   ==> %s ' % menuCurrent.name
@@ -382,10 +409,15 @@ def main(argv):
             #menuCurrent.refreshDisplay()
         except KeyboardInterrupt:
             running = False
-            shifter.clear()
-    GPIO.cleanup()
 
 if __name__=="__main__":
-    main(sys.argv[1:])
+    try:
+        main(sys.argv[1:])
+    finally:
+        lcd.clear()
+        lcd.message('GOING DOWN...\n')
+        shifter.clear()
+        lcd.message('Daemon killed')
+        GPIO.cleanup()
 
 

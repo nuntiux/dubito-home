@@ -29,7 +29,7 @@
 
 set -e 
 
-export ROOTDIR=/root/dubito-home/init.d
+export ROOTDIR=/root/dubito-home/scripts
 
 . /lib/lsb/init-functions
 
