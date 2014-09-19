@@ -20,6 +20,8 @@
 # ----------------------------------------------------------------------------
 
 import sys
+import signal
+import os
 import getopt
 import json
 import random
@@ -126,11 +128,18 @@ def playSequence(seq):
 
 
 # ----------------------------------------------------------------------------
+# Handler for SIGTERM
+# ----------------------------------------------------------------------------
+def sigtermHandler(_signo, _stack_frame):
+    sys.exit(0)
+
+# ----------------------------------------------------------------------------
 # Usage 
 # ----------------------------------------------------------------------------
 def printUsage():
     print "%s - Usage" % (__name__)
     print " -d  Turn debug on"
+    print " -t  Do unit testing"
     print " -h  Print this help"
 
 # ----------------------------------------------------------------------------
@@ -138,8 +147,14 @@ def printUsage():
 # ----------------------------------------------------------------------------
 def main(argv):
     global debug
+    # Initialize Shifter
+    for i in range(0, NUM_SHIFTER):
+        shifters.append(0x0)
+    sequence = []
+    signal.signal(signal.SIGTERM, sigtermHandler)
+
     try:
-        opts, args = getopt.getopt(argv, "hd")
+        opts, args = getopt.getopt(argv, "hdt")
     except getopt.GetoptError:
         printUsage()
         sys.exit(2)
@@ -150,17 +165,19 @@ def main(argv):
             print 'Debug is On'
         elif opt == '-h':
             printUsage()
-    # Initialize Shifter
-    for i in range(0, NUM_SHIFTER):
-        shifters.append(0x0)
-    sequence = []
-    sequence.append(createStep(1, random.randrange(1, 5)))
-    sequence.append(createStep(3, random.randrange(1, 5)))
-    sequence.append(createStep(9, random.randrange(1, 5)))
-    matin = { 'name': "matin", 'seq': sequence , 'cron': "fooo" }
-    print json.dumps(matin, indent = 4)
-    playSequence(matin)
+        elif opt == '-t':
+            sequence.append(createStep(1, random.randrange(1, 5)))
+            sequence.append(createStep(3, random.randrange(1, 5)))
+            sequence.append(createStep(9, random.randrange(1, 5)))
+            matin = { 'name': "matin", 'seq': sequence , 'cron': "fooo" }
+            print json.dumps(matin, indent = 4)
+            playSequence(matin)
 
 # ----------------------------------------------------------------------------
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    try:
+        main(sys.argv[1:])
+    finally:
+        if debug:
+            print "Good bye"
+

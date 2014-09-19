@@ -341,6 +341,14 @@ def sigtermHandler(_signo, _stack_frame):
     sys.exit(0)
 
 # ----------------------------------------------------------------------------
+# Usage.
+# ----------------------------------------------------------------------------
+def printUsage():
+    print "%s - Usage" % (__name__)
+    print " -d  Turn debug on"
+    print " -h  Print this help"
+
+# ----------------------------------------------------------------------------
 # Main
 # ----------------------------------------------------------------------------
 def main(argv):
@@ -357,7 +365,7 @@ def main(argv):
             lcd.setDebug(True)
             print 'Debug is On'
         elif opt == '-h':
-            sleep(5)
+            printUsage()
     signal.signal(signal.SIGTERM, sigtermHandler)
     lcd.begin(16,2)
     lcd.clear()
